@@ -1,0 +1,26 @@
+group,phylum,common_name,class,Described species in Australia,Estimated species in Australia,endemic%
+inv,Acanthocephala,Other Invertebrates,Acanthocephala,56,160,NA
+inv,Annelida,Segmented Worms,Annelids,2192,4230,67
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Insecta,62000,205000,70
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Crustacea,7266,9500,NA
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Arachnida,6615,31338,NA
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Myriapoda,553,3100,86
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Hexapoda,338,2070,17.6
+inv,Arthropoda,"Insects, Crustaceans, Chelicerates and Myriapods",Pycnogonida,215,NA,50
+inv,Chordata,Other Invertebrates,Tunicata,757,850,50
+inv,Hemichordata,Other Invertebrates,Hemichordata,17,22,25
+inv,Chordata,Other Invertebrates,Cephalochordata,8,8,50
+inv,Cnidaria,Corals and Jellies,Cnidarians,1705,2200,NA
+inv,Echindodermata,Seastars and Urchins,Echinoderms,1475,2000,31
+inv,Mollusca,"Snails, Squid and Clams",Molluscs,8700,12250,38
+inv,Nematoda,Round Worms,Nematodes,2060,30000,NA
+inv,Onychophora,Velvet Worms,Onycophora,71,80,100
+inv,Other Invertebrates,Other Invertebrates,Other Invertebrates,2371,5015,NA
+inv,Platyhelminthes,Flat Worms,Platyhelminthes,1593,10000,NA
+inv,Porifera,Sponges,Porifera,1476,3500,56
+ver,Chordata - Fish,NA,Vertebrates,5000,5750,24
+ver,Chordata - Reptiles,NA,Vertebrates,917,950,93
+ver,Chordata - Birds,NA,Vertebrates,828,900,45
+ver,Chordata - Mammals,NA,Vertebrates,386,390,87
+ver,Chordata - Amphibians,NA,Vertebrates,227,230,94
+ver,Chordata - Agnatha,NA,Vertebrates,5,10,60

@@ -1,0 +1,513 @@
+---
+title: "Australian Coverage"
+author: "Fonti Kar"
+date: "2022-10-23"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load(plotly, tidyverse, datapasta, scales, extrafont, sysfonts, showtext, ggrepel, cropcircles, ggimage, patchwork)
+
+font_add_google("Montserrat")
+showtext_auto()
+
+IA_theme <- function() {
+  theme(text = element_text(family = "Avenir"),
+        axis.title = element_text(family = "Avenir",
+                                  size = 12),
+        #small tick marks
+        axis.text = element_text(family = "Avenir",
+                                 size = 12),
+        legend.title = element_text(family = "Avenir",
+                                    size = 12,
+                                    colour = "black"),
+        legend.text = element_text(family = "Avenir",
+                                   size = 12,
+                                   colour = "black"),
+        legend.key = element_rect(fill = "#F5F5F1", color = NA),
+        legend.position = "bottom",
+        legend.justification = "centre",
+        legend.background = element_rect(fill = "#F5F5F1", color = NA), 
+        #panel is where you datapoints are
+        panel.background = element_rect(fill = "#F5F5F1", color = NA),
+        panel.grid.major = element_line(colour = "white"),
+        panel.grid.minor = element_blank(),
+        #area outside the panel
+        plot.title = element_blank(),
+        plot.background = element_rect(fill = "#F5F5F1", color = NA))
+}
+```
+
+## Aims
+
+- Create a visualization to show how 'complete' our invertebrate taxa are, i.e. apparently people are pretty sure we know all the odonates, but only 50% of the Leps.
+- I want the graphic to point people toward taxa that we CAN be sure of and work with and not write things off as probably unknown if it's actually part of a really well-known group. 
+- I think it would be cool to be able to say [all these] Orders can be monitored, etc because they're well understood and then ‘although these Orders are thought to have another 20,000 species to describe, [all these] Families are well described' or whatever. . 
+- Australia only
+- First Phylum 
+- Then Order
+
+## Read in data
+
+```{r}
+phyla <- read_csv("data/phyla_how_complete.csv")
+
+phyla |> rename(describe = `Described species in Australia`,
+                estimated = `Estimated species in Australia`,
+                endemic = `endemic%`) -> phyla
+
+phyla |> print(n =57)
+```
+
+### Data cleaning
+
+```{r}
+phyla |> filter(group == "inv") -> inv
+
+inv |> arrange(phylum, -describe, -estimated) -> inv_ordered
+
+inv_ordered <- inv_ordered |>
+  mutate(phylum_plot = ifelse(common_name == "Other Invertebrates","Other Invertebrates", phylum))  
+
+inv_nested <- inv_ordered |> mutate(class = ifelse(class == phylum, NA, class),
+                      class = ifelse(class %in% c("Molluscs", "Onycophora", 
+                                                  "Nematodes", "Echinoderms", 
+                                                  "Cnidarians", "Annelids", "Other Invertebrates"),NA, class)) 
+
+# Create % described
+inv_nested |> mutate(percent_desc = (describe/estimated)*100) -> inv_per
+
+# Exclude NA percent
+inv_per |> drop_na(percent_desc) -> complete_per
+
+complete_per |> mutate(percent_desc = round(percent_desc, digits = 2)) -> complete_per
+
+```
+
+## Descriptive stats
+
+```{r}
+unique(inv_nested$phylum) |> vector_paste()
+unique(inv_nested$class) |> vector_paste()
+c(NA, "Insecta", "Crustacea", "Arachnida", "Myriapoda", "Hexapoda", "Pycnogonida", "Tunicata", "Cephalochordata")
+c("Acanthocephala", "Annelida", "Arthropoda", "Chordata", "Cnidaria", "Echindodermata", "Hemichordata", "Mollusca", "Nematoda", "Onychophora", "Other", "Platyhelminthes", "Porifera")
+
+# Total described
+sum(inv_nested$describe)
+
+# Total Arthropod describe
+sum(inv_nested[inv_nested$phylum == "Arthropoda","describe"])
+
+# Total Chordata described
+sum(inv_nested[inv_nested$phylum == "Chordata","describe"])
+```
+
+# Plotly
+
+### Plain
+```{r}
+ plot_ly(
+  labels = c("Australian Invertebrates", "Acanthocephala", "Annelida", 
+             "Arthropoda", "Insecta", "Crustacea", "Arachnida", "Myriapoda", "Hexapoda", "Pycnogonida",
+             "Chordata", "Tunicata", "Cephalochordata",
+             "Cnidaria", "Echindodermata", "Hemichordata", "Mollusca", 
+             "Nematoda", "Onychophora", "Other", "Platyhelminthes", "Porifera"),
+   parents = c("", "Australian Invertebrates", "Australian Invertebrates", 
+              "Australian Invertebrates", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda",
+              "Australian Invertebrates", "Chordata", "Chordata",
+              "Australian Invertebrates", "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates",
+              "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates"),
+  type = 'sunburst'
+)
+
+```
+
+
+### Described species
+
+```{r}
+plot_ly(
+  labels = c("Australian Invertebrates", "Acanthocephala", "Annelida",
+             "Arthropoda", "Insecta", "Crustacea", "Arachnida", "Myriapoda", "Hexapoda", "Pycnogonida",
+             "Chordata", "Tunicata", "Cephalochordata",
+             "Cnidaria", "Echindodermata", "Hemichordata", "Mollusca", 
+             "Nematoda", "Onychophora", "Other", "Platyhelminthes", "Porifera"),
+  parents = c("", "Australian Invertebrates", "Australian Invertebrates",
+              "Australian Invertebrates", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda",
+            "Australian Invertebrates", "Chordata", "Chordata",
+            "Australian Invertebrates", "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates",
+              "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates"),
+  values = c(sum(inv_nested$describe), inv_nested$describe[1:2],
+             sum(inv_nested[inv_nested$phylum == "Arthropoda","describe"]), inv_nested$describe[3:8], 
+             sum(inv_nested[inv_nested$phylum == "Chordata","describe"]), inv_nested$describe[9:10],
+             inv_nested$describe[11:19]),
+  
+  type = 'sunburst'
+)
+```
+
+### Estimated species
+
+```{r}
+plot_ly(
+  labels = c("Australian Invertebrates", "Acanthocephala", "Annelida",
+             "Arthropoda", "Insecta", "Crustacea", "Arachnida", "Myriapoda", "Hexapoda", "Pycnogonida",
+             "Chordata", "Tunicata", "Cephalochordata",
+             "Cnidaria", "Echindodermata", "Hemichordata", "Mollusca", 
+             "Nematoda", "Onychophora", "Other", "Platyhelminthes", "Porifera"),
+  parents = c("", "Australian Invertebrates", "Australian Invertebrates",
+              "Australian Invertebrates", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda",
+            "Australian Invertebrates", "Chordata", "Chordata",
+            "Australian Invertebrates", "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates",
+              "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates"),
+  values = c(sum(inv_nested$estimated, na.rm = TRUE), inv_nested$estimated[1:2],
+             sum(inv_nested[inv_nested$phylum == "Arthropoda","estimated"], na.rm = TRUE), inv_nested$estimated[3:8], 
+             sum(inv_nested[inv_nested$phylum == "Chordata","estimated"], na.rm = TRUE), inv_nested$estimated[9:10],
+             inv_nested$estimated[11:19]),
+  
+  type = 'sunburst'
+)
+```
+
+
+### Percent described
+
+```{r}
+plot_ly(
+  labels = c("Australian Invertebrates", "Acanthocephala", "Annelida",
+             "Arthropoda", "Insecta", "Crustacea", "Arachnida", "Myriapoda", "Hexapoda",
+             "Chordata", "Tunicata", "Cephalochordata",
+             "Cnidaria", "Echindodermata", "Hemichordata", "Mollusca", 
+             "Nematoda", "Onychophora", "Other", "Platyhelminthes", "Porifera"),
+  parents = c("", "Australian Invertebrates", "Australian Invertebrates",
+              "Australian Invertebrates", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda", "Arthropoda",
+            "Australian Invertebrates", "Chordata", "Chordata",
+            "Australian Invertebrates", "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates",
+              "Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates","Australian Invertebrates"),
+  values = c(sum(complete_per$percent_desc, na.rm = TRUE), complete_per$percent_desc[1:2],
+             sum(complete_per[complete_per$phylum == "Arthropoda","percent_desc"], na.rm = TRUE), complete_per$percent_desc[3:7], 
+             sum(complete_per[complete_per$phylum == "Chordata","percent_desc"], na.rm = TRUE), complete_per$percent_desc[8:9],
+             complete_per$percent_desc[10:18]),
+  
+  type = 'sunburst'
+)
+```
+
+
+# Simple bar plot
+
+### Phylum
+
+```{r}
+complete_per %>% 
+  pivot_longer(cols = describe:estimated, names_to = "count_type", values_to = "species") -> complete_per_longer
+  
+complete_per_longer %>% 
+  group_by(phylum, count_type) %>% 
+  summarise(species = sum(species)) %>% 
+  ungroup() -> complete_per_longer_summary
+
+complete_per_longer %>% 
+  group_by(phylum_plot, count_type) %>% 
+  summarise(species = sum(species)) %>% 
+  ungroup() -> complete_per_longer_summary
+
+# Compute percent information
+complete_per_longer_summary %>% 
+  pivot_wider(names_from = count_type, values_from = species) %>% 
+  mutate(percent_described = (describe/estimated)*100) -> percent_values_phylum
+
+# Join to counts
+left_join(complete_per_longer_summary, percent_values_phylum)
+
+# Main plot
+main_phylum <- complete_per_longer_summary %>% 
+  #filter(! phylum %in% c("Acanthocephala","Hemichordata", "Onychophora", "Other")) %>% 
+  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
+  ggplot(aes(x = reorder(phylum_plot, desc(species)), y = species, fill = count_type)) + 
+  geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
+  xlab("Phylum") + 
+  ylab("Number of Species") + 
+  scale_y_continuous(limits = c(0, 300000), labels = scales::label_comma()) + 
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),
+                      labels=c('Estimated species', 'Described species')) +
+  guides(fill=guide_legend(title="")) +
+  labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") + 
+  coord_flip() + 
+  theme_minimal() + 
+  IA_theme() + 
+  annotate("text", y = 60000, x = "Other Invertebrates", label = "53%", family = "Avenir", size = 5) + 
+  annotate("text", y = 60000, x = "Platyhelminthes", label = "15.9%", family = "Avenir", size = 5) + 
+  annotate("text", y = 60000, x = "Mollusca", label = "71.0%", family = "Avenir", size = 5) + 
+  annotate("text", y = 60000, x = "Nematoda", label = "6.87%", family = "Avenir", size = 5) + 
+  annotate("text", y = 280000, x = "Arthropoda", label = "30.6%", family = "Avenir", size = 5) 
+  
+
+# Inset
+# Groups with < 10K taxa
+complete_per_longer_summary %>% 
+  filter(species <= 10000,
+         !phylum_plot %in% c("Mollusca", "Nematoda", "Platyhelminthes", "Other Invertebrates")) -> lessthan10k
+
+inset <- lessthan10k %>% 
+  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
+  ggplot(aes(x = reorder(phylum_plot, desc(species)), y = species, fill = count_type)) + 
+  geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
+  scale_y_continuous(limits = c(0, 5000), labels = scales::label_comma()) + 
+  xlab("") + 
+  ylab("") + 
+  scale_fill_manual(values = c("#db9880", "#8D9BBC")) + 
+  #                  ,labels=c('Estimated species', 'Described species')) +
+  # guides(fill=guide_legend(title="")) +
+  # labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") + 
+  coord_flip() + 
+  theme_minimal() + 
+  IA_theme() + 
+  theme(legend.position = "none") + 
+  annotate("text", y = 800, x = "Onychophora", label = "88.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 2500, x = "Echindodermata", label = "73.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 2800, x = "Cnidaria", label = " 77.5%", family = "Avenir", size = 5) + 
+  annotate("text", y = 4000, x = "Porifera", label = "42.2%", family = "Avenir", size = 5) + 
+  annotate("text", y = 4800, x = "Annelida", label = "51.8%", family = "Avenir", size = 5) 
+
+### Put it altogether
+main_phylum + inset_element(inset, 0.1, 0.5, 1, 1)
+```
+
+# Stacked bar plot
+
+### Phylum
+```{r}
+complete_per_longer_summary %>% 
+  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
+  ggplot(aes(fill=count_type, y=species, x=phylum_plot)) + 
+  geom_bar(position="fill", stat="identity") + 
+  scale_fill_manual(values = c("#8D9BBC", "#db9880"),
+                    labels=c('Estimated species', 'Described species')) +
+  scale_y_continuous(labels = scales::label_percent(accuracy = 1)) + 
+  guides(fill=guide_legend(title="")) +
+  xlab("Phylum") + 
+  ylab("Proportion  of Species") + 
+  coord_flip() +
+  IA_theme()
+
+complete_per_longer_summary %>% 
+  mutate(count_type = fct_relevel(count_type,"estimated", "describe")) %>% 
+  ggplot(aes(fill=count_type, y=species, x=phylum_plot)) + 
+  geom_bar(position="fill", stat="identity") + 
+  scale_fill_manual(values = c("#8D9BBC", "#db9880"),
+                    labels=c('Estimated species', 'Described species')) +
+  scale_y_continuous(labels = scales::label_percent(accuracy = 1)) + 
+  guides(fill=guide_legend(title="")) +
+  xlab("Phylum") + 
+  ylab("Proportion  of Species") + 
+  coord_flip() +
+  IA_theme()
+```
+
+
+#### Class
+
+```{r}
+complete_per %>% 
+  filter(!is.na(class)) %>% 
+  pivot_longer(cols = describe:estimated, names_to = "count_type", values_to = "species") -> class_data_longer
+
+class_data_longer %>% 
+  group_by(class, count_type) %>% 
+  summarise(species = sum(species)) %>% 
+  ungroup() -> class_longer_summary
+
+
+class_longer_summary %>% 
+  filter(! class %in% c("Cephalochordata")) %>% 
+  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
+  ggplot(aes(x = reorder(class, desc(species)), y = species, fill = count_type)) + 
+  geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
+  xlab("Class") + 
+  ylab("Number of Species") + 
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),
+                      labels=c('Estimated species', 'Described species')) +
+  guides(fill=guide_legend(title="")) +
+  labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") +
+  coord_flip() + 
+  theme_minimal() + 
+  IA_theme()
+```
+
+#### Crop circles
+
+```{r}
+# https://images.ala.org.au/image/details?imageId=
+# 
+# https://ala-images.s3.ap-southeast-2.amazonaws.com/store/5/a/9/2/5e4bbf48-8752-48b4-8224-a90c7eeee362
+
+images <- paste0(file.path("images/"), list.files("images/"))
+df <- tibble(class = c("Arachnida","Crustacea", "Insecta", "Myriapoda", "Tunicata"), 
+             images = images) %>% 
+  mutate(images_cropped = circle_crop(images))
+
+class_longer_summary %>% 
+  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
+  filter(! class %in% c("Cephalochordata", "Hexapoda")) %>% 
+  left_join(df, by = "class") -> class_longer_summary
+
+class_longer_summary %>%
+  mutate(image_cropped = ifelse(count_type == "estimated",NA,images_cropped),
+         class = reorder(class, desc(species)),
+         value = species + (40000)) -> class_data_final
+
+
+class_data_final %>% 
+  ggplot(aes(x = class, y = species, fill = count_type)) + 
+  geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
+  geom_image(aes(y = value , image = image_cropped), size = .15) + 
+  xlab("Class") + 
+  ylab("Number of Species") + 
+  ylim(c(0,220000)) +
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),
+                      labels=c('Estimated species', 'Described species')) +
+  guides(fill=guide_legend(title="")) +
+  labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") +
+  coord_flip() + 
+  theme_minimal() + 
+  IA_theme()
+```
+
+
+
+### A bubble plot
+
+```{r}
+complete_per %>% 
+ggplot(aes(x = describe, y = estimated, size = percent_desc, colour = phylum)) + 
+  geom_point(alpha = 0.5) + 
+  scale_size(range = c(2,10), name="Percent of species described") + 
+  guides(colour = guide_legend(title = "Phylum")) +
+  xlab("Number of species described") + 
+  ylab("Number of estimated species") +
+  scale_x_log10(label = label_log()) +
+  scale_y_log10(label = label_log()) +
+  theme_minimal()
+```
+
+### Order factor levels of Phylum
+
+```{r}
+complete_per %>% 
+    mutate(phylum = fct_relevel(phylum, 
+            "Acanthocephala", "Annelida", "Arthropoda", 
+            "Chordata", "Cnidaria", "Echindodermata", 
+            "Hemichordata", "Mollusca", "Nematoda", "Onychophora", "Platyhelminthes", "Porifera", "Other")) -> complete_per_2
+
+complete_per_2 %>% 
+ggplot(aes(x = describe, y = estimated, size = percent_desc, colour = phylum)) + 
+  geom_point(alpha = 0.5) + 
+  scale_size(range = c(2,10), name="Percent of species described") + 
+  guides(colour = guide_legend(title = "Phylum")) +
+  xlab("Number of species described") + 
+  ylab("Number of estimated species") +
+  scale_x_log10(label = label_log()) +
+  scale_y_log10(label = label_log()) +
+  theme_minimal()
+```
+
+### An IA colour palette
+
+```{r}
+#In order of
+levels(complete_per_2$phylum)
+
+scale_colour_manual(values = c("#db9880", "#8D9BBC", "#B298BB", 
+                               "#f0dd56", "#9ad9d1", "##B38177",
+                               "#e5cb14", "#A3B28D", "#465577",
+                               "#9aa3b6", "#606672", "#d0b2c9"))
+```
+
+### Get some text on the bubbles
+
+```{r}
+complete_per_2 %>% 
+ggplot(aes(x = describe, y = estimated)) + 
+  geom_point(aes(size = percent_desc, colour = phylum), alpha = 0.5) + 
+  scale_size(range = c(2,10), name="Percent of species described") + 
+  guides(colour = guide_legend(title = "Phylum")) +
+  geom_text(aes(label = phylum), colour = "black", 
+            nudge_x = -0.2, size = 3) +
+  xlab("Number of species described") + 
+  ylab("Number of estimated species") +
+  scale_x_log10(label = label_log()) +
+  scale_y_log10(label = label_log()) +
+  theme_minimal()
+```
+
+```{r}
+#importing fonts
+#if you are using extrafont
+font_import() #press y + Enter to add fonts
+fonttable()
+#if you are using sysfont & showtext
+font_add_google("Montserrat")
+showtext_auto()
+```
+
+
+### An IA theme
+
+We need 14 colours
+
+```{r}
+IA_theme <- function() {
+  theme(axis.title = element_text(family = "Montserrat",
+                                  size = 12),
+        #small tick marks
+        axis.text = element_text(family = "Montserrat",
+                                 size = 12),
+        legend.title = element_text(family = "Montserrat",
+                                    size = 12,
+                                    colour = "black"),
+        legend.text = element_text(family = "Montserrat",
+                                   size = 12,
+                                   colour = "black"),
+        legend.key = element_rect(fill = "#F5F5F1"),
+        legend.position = "bottom",
+        legend.justification = "centre",
+        legend.background = element_rect(fill = "#F5F5F1"), 
+        #panel is where you datapoints are
+        panel.background = element_rect(fill = "#F5F5F1"),
+        panel.grid.major = element_line(colour = "white"),
+        panel.grid.minor = element_blank(),
+         #area outside the panel
+        plot.title = element_blank(),
+        plot.background = element_rect(fill = "#F5F5F1"))
+}
+
+complete_per_2 %>% 
+ggplot(aes(x = describe, y = estimated)) + 
+  geom_point(aes(size = percent_desc, colour = phylum), alpha = 0.7) + 
+  scale_size(range = c(2,10), name="Percent of species described") + 
+# guides(colour = guide_legend(title = "Phylum")) +
+  guides(size= guide_legend(override.aes=list(colour = "#bebea4"))) +
+  # geom_text(aes(label = phylum), colour = "black", 
+  #           size = 3, family = "Montserrat") +
+  geom_text_repel(aes(label = phylum), colour = "black", 
+                  size = 3, family = "Montserrat",
+                  point.padding = 1) +
+  xlab("Number of described species") + 
+  ylab("Number of estimated species") +
+  scale_x_log10(label = label_log()) +
+  scale_y_log10(label = label_log()) +
+  scale_colour_manual(values = c("#db9880", "#8D9BBC", "#B298BB", 
+                               "#f0dd56", "#9ad9d1", "#eab35a",
+                               "#CAA17C", "#A3B28D", "#465577",
+                               "#9aa3b6", "#606672", "#b0d9f5",
+                               "#d0d0d0"), guide = "none") +
+  IA_theme()
+```
+
+https://www.rgbtohex.net/
+https://pinetools.com/lighten-color
