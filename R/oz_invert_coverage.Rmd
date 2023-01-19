@@ -10,10 +10,8 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-pacman::p_load(plotly, tidyverse, datapasta, scales, extrafont, sysfonts, showtext, ggrepel, cropcircles, ggimage, patchwork)
+pacman::p_load(plotly, tidyverse, datapasta, scales)
 
-font_add_google("Montserrat")
-showtext_auto()
 
 IA_theme <- function() {
   theme(text = element_text(family = "Avenir"),
@@ -126,7 +124,6 @@ sum(inv_nested[inv_nested$phylum == "Chordata","describe"])
 
 ```
 
-
 ### Described species
 
 ```{r}
@@ -173,7 +170,6 @@ plot_ly(
 )
 ```
 
-
 ### Percent described
 
 ```{r}
@@ -200,113 +196,184 @@ plot_ly(
 
 # Simple bar plot
 
-### Phylum
+## Phylum
 
 ```{r}
 complete_per %>% 
   pivot_longer(cols = describe:estimated, names_to = "count_type", values_to = "species") -> complete_per_longer
   
 complete_per_longer %>% 
-  group_by(phylum, count_type) %>% 
+  group_by(common_name, count_type) %>% 
   summarise(species = sum(species)) %>% 
   ungroup() -> complete_per_longer_summary
 
-complete_per_longer %>% 
-  group_by(phylum_plot, count_type) %>% 
-  summarise(species = sum(species)) %>% 
-  ungroup() -> complete_per_longer_summary
+# complete_per_longer %>% 
+#   group_by(phylum_plot, count_type) %>% 
+#   summarise(species = sum(species)) %>% 
+#   ungroup() -> complete_per_longer_summary
 
-# Compute percent information
-complete_per_longer_summary %>% 
+common_name_stack <- complete_per_longer_summary
+
+# Fix long names
+common_name_stack$common_name[5] <- "Insects, Crabs, \n Spiders and Millipedes"
+common_name_stack$common_name[6] <- "Insects, Crabs, \n Spiders and Millipedes"
+
+# Arrange stacked bars from low to high
+# Trick the stacked bars
+common_name_stack %>% 
   pivot_wider(names_from = count_type, values_from = species) %>% 
-  mutate(percent_described = (describe/estimated)*100) -> percent_values_phylum
-
-# Join to counts
-left_join(complete_per_longer_summary, percent_values_phylum)
+  mutate(percent_described = (describe/estimated)*100,
+         remaining_unknown = estimated - describe, 
+         common_name_total = paste(common_name, "\n",estimated, "species")) %>% 
+  select(common_name, common_name_total, percent_described, describe, estimated) %>% 
+  pivot_longer(values_to = 'species', names_to = "count_type", cols = 4:5) -> common_name_absolute_with_percent
 
 # Main plot
-main_phylum <- complete_per_longer_summary %>% 
-  #filter(! phylum %in% c("Acanthocephala","Hemichordata", "Onychophora", "Other")) %>% 
-  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
-  ggplot(aes(x = reorder(phylum_plot, desc(species)), y = species, fill = count_type)) + 
+main_phylum <- 
+common_name_absolute_with_percent %>% 
+  mutate(
+    count_type = fct_relevel(count_type, "estimated", "describe"),
+    common_name_total = fct_reorder(common_name_total, desc(species))) %>% 
+  ggplot(aes(x = common_name_total, y = species, fill = count_type)) + 
   geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
   xlab("Phylum") + 
   ylab("Number of Species") + 
-  scale_y_continuous(limits = c(0, 300000), labels = scales::label_comma()) + 
-  scale_fill_manual(values = c("#db9880", "#8D9BBC"),
-                      labels=c('Estimated species', 'Described species')) +
+  scale_y_continuous(limits = c(0, 270000), 
+                     breaks = scales::breaks_extended(7),
+                     labels = scales::label_comma()) + 
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),  
+                    labels=c('Described species', 'Estimated species'),
+                    breaks=c('describe', 'estimated')) +
   guides(fill=guide_legend(title="")) +
   labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") + 
   coord_flip() + 
   theme_minimal() + 
-  IA_theme() + 
-  annotate("text", y = 60000, x = "Other Invertebrates", label = "53%", family = "Avenir", size = 5) + 
-  annotate("text", y = 60000, x = "Platyhelminthes", label = "15.9%", family = "Avenir", size = 5) + 
-  annotate("text", y = 60000, x = "Mollusca", label = "71.0%", family = "Avenir", size = 5) + 
-  annotate("text", y = 60000, x = "Nematoda", label = "6.87%", family = "Avenir", size = 5) + 
-  annotate("text", y = 280000, x = "Arthropoda", label = "30.6%", family = "Avenir", size = 5) 
+  IA_theme()  
+  annotate("text", y = 15000, x = "Other Invertebrates \n 6055 species", label = "53%", family = "Avenir", size = 5) + 
+  annotate("text", y = 19000, x = "Flat Worms \n 10000 species", label = "15.9%", family = "Avenir", size = 5) + 
+  annotate("text", y = 22000, x = "Snails, Squid and Clams \n 12250 species", label = "71.0%", family = "Avenir", size = 5) + 
+  annotate("text", y = 40500, x = "Round Worms \n 30000 species", label = "6.87%", family = "Avenir", size = 5) +
+  annotate("text", y = 260500, x = "Insects, Crabs, \n Spiders and Millipedes \n 251008 species", label = "30.6%", family = "Avenir", size = 5) +
+  annotate("text", y = 12000, x = "Velvet Worms \n 80 species", label = "88.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 12000, x = "Seastars and Urchins \n 2000 species", label = "73.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 15000, x = "Corals and Jellies \n 2200 species", label = " 77.5%", family = "Avenir", size = 5) + 
+  annotate("text", y = 15000, x = "Sponges \n 3500 species", label = "42.2%", family = "Avenir", size = 5) + 
+  annotate("text", y = 15000, x = "Segmented Worms \n 4230 species", label = "51.8%", family = "Avenir", size = 5)
+
+ggsave("output/main_phylum", device = cairo_pdf, width = 12, height = 8)
   
+```
 
-# Inset
+### Inset
+```{r}
+
 # Groups with < 10K taxa
-complete_per_longer_summary %>% 
+common_name_absolute_with_percent %>% 
   filter(species <= 10000,
-         !phylum_plot %in% c("Mollusca", "Nematoda", "Platyhelminthes", "Other Invertebrates")) -> lessthan10k
+         !common_name %in% c("Snails, Squid and Clams", "Round Worms", "Flat Worms", "Other Invertebrates")) -> lessthan10k
 
-inset <- lessthan10k %>% 
-  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
-  ggplot(aes(x = reorder(phylum_plot, desc(species)), y = species, fill = count_type)) + 
+inset <- 
+lessthan10k %>% 
+  mutate(
+    count_type = fct_relevel(count_type, "estimated", "describe"),
+    common_name = fct_reorder(common_name, desc(species))) %>% 
+  ggplot(aes(x = common_name, y = species, fill = count_type)) + 
   geom_bar(stat = "identity", position = position_dodge(), alpha = 0.8) + 
-  scale_y_continuous(limits = c(0, 5000), labels = scales::label_comma()) + 
+  scale_y_continuous(limits = c(0, 4600), 
+                     labels = scales::label_comma()) + 
   xlab("") + 
   ylab("") + 
-  scale_fill_manual(values = c("#db9880", "#8D9BBC")) + 
-  #                  ,labels=c('Estimated species', 'Described species')) +
-  # guides(fill=guide_legend(title="")) +
-  # labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") + 
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),  
+                    labels=c('Described species', 'Estimated species'),
+                    breaks=c('describe', 'estimated')) + 
   coord_flip() + 
   theme_minimal() + 
-  IA_theme() + 
+  IA_theme() +
   theme(legend.position = "none") + 
-  annotate("text", y = 800, x = "Onychophora", label = "88.8%", family = "Avenir", size = 5) + 
-  annotate("text", y = 2500, x = "Echindodermata", label = "73.8%", family = "Avenir", size = 5) + 
-  annotate("text", y = 2800, x = "Cnidaria", label = " 77.5%", family = "Avenir", size = 5) + 
-  annotate("text", y = 4000, x = "Porifera", label = "42.2%", family = "Avenir", size = 5) + 
-  annotate("text", y = 4800, x = "Annelida", label = "51.8%", family = "Avenir", size = 5) 
+  annotate("text", y = 300, x = "Velvet Worms", label = "88.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 2280, x = "Seastars and Urchins", label = "73.8%", family = "Avenir", size = 5) + 
+  annotate("text", y = 2450, x = "Corals and Jellies", label = " 77.5%", family = "Avenir", size = 5) + 
+  annotate("text", y = 3800, x = "Sponges", label = "42.2%", family = "Avenir", size = 5) + 
+  annotate("text", y = 4450, x = "Segmented Worms", label = "51.8%", family = "Avenir", size = 5)
+    
 
 ### Put it altogether
-main_phylum + inset_element(inset, 0.1, 0.5, 1, 1)
+main_phylum + inset_element(inset, 0.2, 0.4, 1, 1)
 ```
 
 # Stacked bar plot
 
 ### Phylum
 ```{r}
-complete_per_longer_summary %>% 
-  mutate(count_type = fct_relevel(count_type, "estimated", "describe")) %>% 
-  ggplot(aes(fill=count_type, y=species, x=phylum_plot)) + 
-  geom_bar(position="fill", stat="identity") + 
-  scale_fill_manual(values = c("#8D9BBC", "#db9880"),
-                    labels=c('Estimated species', 'Described species')) +
-  scale_y_continuous(labels = scales::label_percent(accuracy = 1)) + 
-  guides(fill=guide_legend(title="")) +
-  xlab("Phylum") + 
-  ylab("Proportion  of Species") + 
-  coord_flip() +
-  IA_theme()
+# Arrange stacked bars from low to high
+# Trick the stacked bars
+common_name_stack %>% 
+  pivot_wider(names_from = count_type, values_from = species) %>% 
+  mutate(percent_described = (describe/estimated)*100,
+         remaining_unknown = estimated - describe,
+         percent_unknown = (remaining_unknown/estimated)*100) %>% 
+  select(common_name, percent_described, percent_unknown, describe, -estimated, remaining_unknown) %>% 
+  pivot_longer(values_to = 'species', names_to = "count_type", cols = 4:5) -> common_name_stack_with_percent
 
-complete_per_longer_summary %>% 
-  mutate(count_type = fct_relevel(count_type,"estimated", "describe")) %>% 
-  ggplot(aes(fill=count_type, y=species, x=phylum_plot)) + 
+# Make the main plot
+common_name_stack_with_percent %>% 
+  mutate(count_type = fct_relevel(count_type, "remaining_unknown", "describe"),
+         common_name = fct_reorder(common_name, desc(percent_described))) %>%
+  ggplot(aes(fill=count_type, y=species, x=common_name)) + 
   geom_bar(position="fill", stat="identity") + 
-  scale_fill_manual(values = c("#8D9BBC", "#db9880"),
-                    labels=c('Estimated species', 'Described species')) +
+  scale_fill_manual(values = c("#db9880", "#8D9BBC"),  
+                    labels=c('Described species', 'Estimated species'),
+                    breaks=c('describe', 'remaining_unknown')) +
   scale_y_continuous(labels = scales::label_percent(accuracy = 1)) + 
   guides(fill=guide_legend(title="")) +
   xlab("Phylum") + 
-  ylab("Proportion  of Species") + 
+  ylab("Percentage  of Total Estimated Number of Species") + 
+  labs(caption = "(based on data from Chapman (2009) Numbers of Living Species in Australia and the World)") + 
   coord_flip() +
-  IA_theme()
+  IA_theme() -> stacked_phylum_p
+  
+# Annotate with percentages known
+stacked_phylum_p + 
+  annotate("text", y = 0.035, x = "Round Worms", label = "6.87%", family = "Avenir", size = 4, colour = "white") +
+  annotate("text", y = 0.035, x = "Flat Worms", label = "15.9%", family = "Avenir", size = 4, colour = "white") +
+  annotate("text", y = 0.035, x = "Insects, Crabs, \n Spiders and Millipedes", label = " 30.6%", family = "Avenir", size = 4.5, colour = "white") + 
+  annotate("text", y = 0.035, x = "Sponges", label = "42.2%", family = "Avenir", size = 4, colour = "white") +
+  annotate("text", y = 0.035, x = "Segmented Worms", label = "51.8%", family = "Avenir", size = 4, colour = "white") + 
+  annotate("text", y = 0.035, x = "Other Invertebrates", label = "53%", family = "Avenir", size = 4, colour = "white") + 
+  annotate("text", y = 0.035, x = "Snails, Squid and Clams", label = "71%", family = "Avenir", size = 4, colour = "white") + 
+  annotate("text", y = 0.035, x = "Seastars and Urchins", label = "73.8%", family = "Avenir", size = 4, colour = "white") +
+  annotate("text", y = 0.035, x = "Corals and Jellies", label = "77.5%", family = "Avenir", size = 4, colour = "white") + 
+  annotate("text", y = 0.035, x = "Velvet Worms", label = "88.8%", family = "Avenir", size = 4, colour = "white") -> stacked_phylum_percent
+
+
+# Annotate with percent unknown
+stacked_phylum_percent + 
+  annotate("text", y = 0.95, x = "Round Worms", label = "93.1%", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.95, x = "Flat Worms", label = "84.1%", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.95, x = "Insects, Crabs, \n Spiders and Millipedes", label = "69.4%", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.95, x = "Sponges", label = "57.8%", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.95, x = "Segmented Worms", label = "48.2%", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.95, x = "Other Invertebrates", label = "47%", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.95, x = "Snails, Squid and Clams", label = "29%", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.95, x = "Seastars and Urchins", label = "26.2", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.95, x = "Corals and Jellies", label = "22.5%", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.95, x = "Velvet Worms", label = "11.2%", family = "Avenir", size = 4, color = "white")
+  
+
+# Annotate with total described species
+stacked_phylum_percent + 
+  annotate("text", y = 0.92, x = "Round Worms", label = "6,055 species", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.92, x = "Flat Worms", label = "10,000 species", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.92, x = "Insects, Crustaceans,\n Chelicerates and Myriapods", label = "251,008 species", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.92, x = "Sponges", label = "3,500 species", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.92, x = "Segmented Worms", label = "4,230 species", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.92, x = "Other Invertebrates", label = "6,055 species", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.92, x = "Snails, Squid and Clams", label = "12,250 species", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.92, x = "Seastars and Urchins", label = "2,000 species", family = "Avenir", size = 4, color = "white") +
+  annotate("text", y = 0.92, x = "Corals and Jellies", label = "2,200 species", family = "Avenir", size = 4, color = "white") + 
+  annotate("text", y = 0.943, x = "Velvet Worms", label = "80 species", family = "Avenir", size = 4, color = "white")
+  
+  
 ```
 
 
